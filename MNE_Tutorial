@@ -1,0 +1,116 @@
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import mne
+from scipy.fft import fft, fftfreq
+
+# Tutorial made based off https://mne.tools/stable/index.html
+# Dummy metadata
+# Dummy Wavefunction for plotting\
+def Synthetic_Data():
+    sampling_freq = 200 # in hertz
+    n_samples = sampling_freq * 2
+    time = np.linspace(0,2,n_samples)
+    Fp1 = np.sin(np.pi * time) + np.cos(np.pi * time) # Set channel Fp1 wave form
+    Fp2 = np.sin(np.pi * time) + np.cos(2 * np.pi * time) # Set channel Fp2 wave form
+    Fz = np.sin(2 * np.pi*time) + np.cos(2 * np.pi * time) # Set channel Fz wave form
+
+    # Print information of the file
+    n_channels = ['Fp1', 'Fp2', 'Fz'] # String input
+    ch_type = ['eeg', 'eeg', 'eeg'] # String input
+    file_info = mne.create_info(ch_names=n_channels, sfreq=sampling_freq, ch_types=ch_type) # Create file info according to MNE standards
+    print(file_info)
+
+    graph_info = mne.create_info(
+        ch_names=["Fp1", "Fp2", "Fz"], ch_types=["misc"] * 3, sfreq=sampling_freq # Create 
+    )
+    data = np.array([Fp1, Fp2, Fz])
+
+    simulated_raw = mne.io.RawArray(data, graph_info)
+    simulated_raw.plot(show_scrollbars=True, show_scalebars=True)
+
+    plt.show()
+
+def EEG_import():
+    # Define path
+    # File details
+    
+    # sub_str = "S001"
+    # trial_str = "R01"
+    file_path = r"REPLACE WITH EEG FILE LOCATION"
+
+    # Read file
+    raw = mne.io.read_raw_edf(file_path, preload=True)
+
+    # Print file metadata
+    print(raw)
+    print(raw.info)
+
+    
+    raw.plot(show_scrollbars=True, show_scalebars=True)
+
+    plt.show()
+
+    # Power Spectral Density (Welch's method)
+    # Calculates PSD along all channels
+    Sub1 = raw.compute_psd(method='welch', fmin=1, fmax=50)
+    Sub1.plot()
+    plt.show()
+    
+    # Calculates PSD on a single channel
+    # Uses standard FFT
+    channel_name = 'Fc5.'
+    data, time = raw[channel_name, :]
+    data = data.squeeze()
+
+    sfreq = raw.info['sfreq']
+    n_samples = len(data)
+
+    fft_vals = fft(data)
+    freqs = fftfreq(n_samples, 1/sfreq)
+
+    # Nyquist Theorem to remove negative frequency
+    pos_mask = freqs >= 0
+    freqs = freqs[pos_mask]
+    magnitude = np.abs(fft_vals[pos_mask])*(2/n_samples)
+
+    # Plot raw FFT magnitude for selected channel
+    plt.figure(figsize=(10, 4))
+    # Count it high end for Hz
+    Count = 80
+    plt.plot(freqs[:int(Count * n_samples / sfreq)], magnitude[:int(Count * n_samples / sfreq)])
+    plt.title(f"Direct FFT Magnitude Spectrum for Channel {channel_name}")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Magnitude (µV)")
+    plt.grid(True)
+
+    plt.show()
+
+    # Preprocessing
+    # Copy of data
+    raw_filtered = raw.copy()
+    # Bandpass filter
+    raw_filtered.filter(l_freq=1, h_freq=59, fir_design="firwin")
+    # Plot filtered waveform
+    raw_filtered.plot(
+        show_scrollbars=True,
+        show_scalebars=True,
+        scalings=dict(eeg=20e-6),
+        n_channels=1
+        #title=f"Filtered (1-59 Hz) - {sub_str}{run_str}",
+    )
+    plt.show()
+    # PSD filtered plot
+    psd_filtered = raw_filtered.compute_psd(
+        method="welch", fmin=1, fmax=59
+    )
+    psd_filtered.plot()
+    plt.show()
+    # Ignore to be implemented for large scale data loading
+    #loaded_data[f"{sub_str}{run_str}"] = raw_filtered
+    #return loaded_data
+    
+EEG_import()
+# Ignore to be implemented later
+# To be used as a call to how data is used in machine learning
+    #eeg_dictionary = EEG_import(subjects=[1], runs=[1], target_channel="Fc5")
